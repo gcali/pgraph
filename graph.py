@@ -6,6 +6,9 @@ from random import seed, randint
 
 from queue import Queue
 
+def empty_fun(*args):
+  pass
+
 class Graph(dict):
   def connect(self,a,b):
     self.create(a)
@@ -49,7 +52,7 @@ class Graph(dict):
     forest = []
     for node in self.nodes():
       if node not in visited:
-        forest.append(self.bfs(node, visited))
+        forest.append(self.bfs(node, visited, empty_fun))
     return forest
 
         
@@ -75,7 +78,7 @@ class Graph(dict):
     forest = []
     for node in self.nodes():
       if node not in visited:
-        forest.append(self.dfs(node, visited))
+        forest.append(self.dfs(node, visited, empty_fun))
     return forest
         
 
@@ -146,5 +149,5 @@ if __name__ == "__main__":
 
     create_dot_graph([g], file_name + "_orig.jpg")
     forest = g.dfs_forest()
-    print(forest)
     create_dot_graph(forest, file_name + "_dfs.jpg")
+    create_dot_graph([g.bfs(0, fun=empty_fun)], file_name + "_bfs.jpg")
