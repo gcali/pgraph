@@ -1,6 +1,8 @@
 #! /usr/bin/env python3
 
 import sys
+import subprocess
+from random import seed, randint
 
 from queue import Queue
 
@@ -41,6 +43,17 @@ class Graph(dict):
 
     return create_tree(node, father)
 
+  def bfs_forest(self):
+    
+    visited = set()
+    forest = []
+    for node in self.nodes():
+      if node not in visited:
+        forest.append(self.bfs(node, visited))
+    return forest
+
+        
+
   def dfs(self, root, visited = set(), fun = print): 
 
     self._father = {}
@@ -57,7 +70,16 @@ class Graph(dict):
 
     return create_tree(root, father)
 
-  def _dfs_rec(self, root, fun = print):
+  def dfs_forest(self):
+    visited = set()
+    forest = []
+    for node in self.nodes():
+      if node not in visited:
+        forest.append(self.dfs(node, visited))
+    return forest
+        
+
+  def _dfs_rec(self, root, fun):
     fun(root)
     for child in self.adj(root):
       if child not in self._visited:
@@ -75,19 +97,23 @@ def create_tree(root, father):
 
   return g
 
-def create_dot_graph(g, out):
-  print(r"digraph {", file=out)
-  for node in g.nodes():
-    for child in g.adj(node):
-      print(r"  {0} -> {1} ;".format(node, child), file=out)
-  print(r"}", file=out)
+def create_dot_graph(g_list, name_out):
+
+  with subprocess.Popen(["dot", "-Tjpg", "-o", name_out],
+                        stdin=subprocess.PIPE) as proc:
+    proc.stdin.write(bytes("digraph {\n"\
+                           "  rankdir=LR\n", "UTF-8"))
+    for g in g_list:
+      for node in g.nodes():
+        proc.stdin.write(bytes("  {0} ;\n".format(node), "UTF-8"))
+        for child in g.adj(node):
+          proc.stdin.write(bytes("  {0} -> {1} ;\n".format(node, child), "UTF-8"))
+    proc.stdin.write(bytes("}\n", "UTF-8"))
     
 
 
 if __name__ == "__main__":
-  if not sys.argv:
-    exit(1)
-  else:
+  if len(sys.argv) < 2:
     g = Graph()
     g.connect(0, 2)
     g.connect(0, 4)
@@ -95,7 +121,30 @@ if __name__ == "__main__":
     g.connect(3, 1)
     g.connect(3, 4)
     g.connect(1, 0)
-  with open("data.gv", "w") as f:
-    create_dot_graph(g.bfs(0), f)
-  with open("dfs.gv", "w") as f:
-    create_dot_graph(g.dfs(0), f)
+    print(g)
+  else: 
+    seed()
+    file_name = sys.argv[1]
+    if len(sys.argv) >= 3:
+      n_nodes = int(sys.argv[2])
+    else:
+      n_nodes = 10
+    if len(sys.argv) >= 4:
+      n_edges = int(sys.argv[3])
+    else:
+      n_edges = n_nodes * 3 // 2
+
+    g = Graph()
+
+    for i in range(n_nodes):
+       g.create(i)
+
+    for i in range(n_edges):
+      source = randint(0,n_nodes-1)
+      dest = randint(0,n_nodes-1)
+      g.connect(source, dest)
+
+    create_dot_graph([g], file_name + "_orig.jpg")
+    forest = g.dfs_forest()
+    print(forest)
+    create_dot_graph(forest, file_name + "_dfs.jpg")
