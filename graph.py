@@ -125,6 +125,9 @@ if __name__ == "__main__":
     g.connect(3, 4)
     g.connect(1, 0)
     print(g)
+    create_dot_graph([g], "custom_orig.jpg")
+    create_dot_graph(g.dfs_forest(), "custom_dfs.jpg")
+    create_dot_graph([g.bfs(0, fun=empty_fun)], "custom_bfs.jpg")
   else: 
     seed()
     file_name = sys.argv[1]
