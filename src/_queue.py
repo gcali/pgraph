@@ -35,6 +35,12 @@ class Queue(metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def empty(self) -> bool:
+        """Returns True iff the queue is empty
+        """
+        pass
+
+    @abstractmethod
     def is_in(self, item:"Comparable") -> bool:
         """Returns True iff item is in the queue
         """
@@ -70,6 +76,14 @@ class FifoQueue(Queue):
         retval = self.elements[0]
         self.elements = self.elements[1:]
         return retval
+
+    def empty(self) -> bool:
+        """Returns True iff the queue is empty
+        """
+        if self.elements:
+            return False
+        else:
+            return True
 
     def is_in(self, item:"Comparable") -> bool:
         """Returns True iff item is in the queue
@@ -118,6 +132,14 @@ class PriorityQueue(metaclass=ABCMeta):
             return (heapq.heappop(self.elements))[2]
         except IndexError:
             raise EmptyException
+
+    def empty(self) -> bool:
+        """Returns True iff the queue is empty
+        """
+        if self.elements:
+            return False
+        else:
+            return True
 
     def is_in(self, item:"Comparable") -> bool:
         """Returns True iff item is in the queue

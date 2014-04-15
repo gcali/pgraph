@@ -3,6 +3,7 @@
 from collections import Hashable
 from types import GeneratorType
 import itertools
+from _queue import Queue, FifoQueue, PriorityQueue
 
 class Edge():
     """Edge class
@@ -197,7 +198,12 @@ class Node():
     def __str__(self):
         def comparison_function(edge):
             return edge.end_label
-        return "{} -> {}".format(
+        if self.value != None:
+            value="({}) ".format(self.value)
+        else:
+            value = ""
+        return "{}{} -> {}".format(
+            value,
             str(self.label),
             ", ".join((str(x) for x in
                        sorted(self.connections.values(),
@@ -219,6 +225,8 @@ class Graph():
         """
         if label not in self.list_nodes():
             self.node_map[label] = Node(label, value)
+        if value != None and self.get_node_value(label) == None:
+            self.set_value(label, value)
 
     def add_connection(self, start_label:Hashable, end_label:Hashable,
                              weight:int=None, lbound:int=None,
@@ -287,7 +295,7 @@ class Graph():
         Raises:
             KeyError:   label wasn't found in the graph
         """
-        return self[label].get_value()
+        return self.node_map[label].get_value()
 
     def set_node_value(self, label:Hashable, value:int) -> None:
         """Sets the value of the node label
@@ -295,7 +303,7 @@ class Graph():
         Raises:
             KeyError:   label wasn't found in the graph
         """
-        self[label].set_value(value)
+        self.node_map[label].set_value(value)
 
     def get_weight(self, start_label:Hashable, end_label:Hashable) -> int:
         """Returns the current weight from start_label to end_label
@@ -369,28 +377,75 @@ class Graph():
         """
         self.node_map[start_label].set_flux(end_label, flux)
 
+    def _shortest_path(self, start_node:Hashable, queue:Queue) -> "Graph":
+        father = {}
+        distance = {}
+
+        for node in self.list_nodes():
+            distance[node] = None
+            father[node] = None
+
+        distance[start_node] = 0
+        father[start_node] = None
+
+        queue.put(start_node, distance[start_node])
+
+        while not queue.empty():
+            node = queue.get()
+            for neighbour in self.forward_star(node):
+                if distance[neighbour] == None or \
+                   (self.get_weight(node, neighbour) != None and \
+                    distance[node] + self.get_weight(node, neighbour) < distance[neighbour]):
+                    connection_weight = self.get_weight(node, neighbour)
+                    if connection_weight == None:
+                        connection_weight = 0
+                    distance[neighbour] = distance[node] + connection_weight
+                    father[neighbour] = node
+                    queue.put(neighbour, distance[neighbour])
+
+        result = Graph()
+        result.add_node(start_node,value=0)
+        for node in self.list_nodes():
+            if father[node] != None:
+                result.add_connection(father[node], node)
+                result.set_node_value(node, distance[node])
+
+        return result
+
+    def dijkstra(self, start_label:Hashable) -> "Graph":
+        """Returns the graph of the visit starting from start_label
+
+        Dijkstra's algorithm is used for the visit
+        """
+        queue = FifoQueue()
+        return self._shortest_path(start_label, queue)
+
+    def bellman(self, start_label:Hashable) -> "Graph":
+        """Returns the graph of the visit starting from start_label
+
+        Bellman's algorithm is used for the visit
+        """
+        queue = PriorityQueue()
+        return self._shortest_path(start_label, queue)
+
     def __str__(self):
         graph_list = []
         for node in self.list_nodes():
             graph_list.append(str(self.node_map[node]))
-        return "\n".join(graph_list)
-
-            
+        return "\n".join(graph_list) 
 
 if __name__ == '__main__':
     g = Graph()
     g.add_node(1)
     g.add_node(2)
     g.add_node(3)
-    g.add_connection(1,2)
-    g.add_connection(1,3, weight=3, ubound=15, flux=12)
-    g.add_connection(2,3)
-    g.add_connection(3,4)
-    g.add_connection(4,1)
+    g.add_node(4)
+    g.add_connection(1,2, weight=1)
+    g.add_connection(2,4, weight=1)
+    g.add_connection(2,3, weight=2)
+    g.add_connection(4,5, weight=1)
+    g.add_connection(3,5, weight=0)
     print(g)
-    print("Forward star 1")
-    for n in g.forward_star(1):
-        print(n)
-    print("Forward star 4")
-    for n in g.forward_star(4):
-        print(n)
+    print(g.dijkstra(1))
+    print()
+    print(g.bellman(1))
