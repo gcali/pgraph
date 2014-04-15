@@ -2,7 +2,10 @@
 
 from collections import Hashable
 from types import GeneratorType
+
 import itertools
+import subprocess
+
 from _queue import Queue, FifoQueue, PriorityQueue
 
 class Edge():
@@ -428,6 +431,24 @@ class Graph():
         queue = PriorityQueue()
         return self._shortest_path(start_label, queue)
 
+    def create_img(self, name_file:str) -> None:
+        with subprocess.Popen(["dot", "-Tjpg", "-o", name_file],
+                              stdin=subprocess.PIPE) as proc:
+            proc.stdin.write(bytes("digraph {\n"\
+                                   "    rankdir=LR\n", "UTF-8"))
+            for node in self.list_nodes():
+                print(node)
+                for child in self.forward_star(node):
+                    proc.stdin.write(bytes("    {0} -> {1} ".format(node,
+                                                                    child),
+                                           "UTF-8"))
+                    if self.get_weight(node, child) != None:
+                        proc.stdin.write(bytes("[label=\"{}\"]".format(
+                                               self.get_weight(node, child)
+                                               ), "UTF-8"))
+                    proc.stdin.write(bytes(";\n", "UTF-8"))
+            proc.stdin.write(bytes("}\n", "UTF-8"))
+
     def __str__(self):
         graph_list = []
         for node in self.list_nodes():
@@ -449,3 +470,4 @@ if __name__ == '__main__':
     print(g.dijkstra(1))
     print()
     print(g.bellman(1))
+    g.create_img("test.jpg")
