@@ -2,11 +2,16 @@
 
 from collections import Hashable
 from types import GeneratorType
+import sys
 
 import itertools
 import subprocess
+import re
 
 from _queue import Queue, FifoQueue, PriorityQueue
+
+class NoConection(Exception):
+    pass
 
 class Edge():
     """Edge class
@@ -130,73 +135,97 @@ class Node():
         """Returns the current weight to end_label
 
         Raises:
-            KeyError:   end_label wasn't found
-                        in the connections
+            NoConnection:   end_label wasn't found
+                            in the connections
         """
-        return self.connections[end_label].get_weight()
+        try:
+            return self.connections[end_label].get_weight()
+        except KeyError:
+            raise NoConnection
 
     def set_weight(self, end_label, weight) -> None:
         """Sets the current weight to end_label
         
         Raises:
-            KeyError:   end_label wasn't found
-                        in the connections
+            NoConnection:   end_label wasn't found
+                            in the connections
         """
-        self.connections[end_label].set_weight(weight)
+        try:
+            self.connections[end_label].set_weight(weight)
+        except KeyError:
+            raise NoConnection
 
     def get_lbound(self, end_label) -> int:
         """Returns the current lbound to end_label
         
         Raises:
-            KeyError:   end_label wasn't found
-                        in the connections
+            NoConnection:   end_label wasn't found
+                            in the connections
         """
-        return self.connections[end_label].get_lbound()
+        try:
+            return self.connections[end_label].get_lbound()
+        except KeyError:
+            raise NoConnection
 
     def set_lbound(self, end_label, lbound) -> None:
         """Sets the current lbound to end_label
         
         Raises:
-            KeyError:   end_label wasn't found
-                        in the connections
+            NoConnection:   end_label wasn't found
+                            in the connections
         """
-        self.connections[end_label].set_lbound(lbound)
+        try:
+            self.connections[end_label].set_lbound(lbound)
+        except KeyError:
+            raise NoConnection
 
     def get_ubound(self, end_label) -> int:
         """Returns the current ubound to end_label
         
         Raises:
-            KeyError:   end_label wasn't found
-                        in the connections
+            NoConnection:   end_label wasn't found
+                            in the connections
         """
-        return self.connections[end_label].get_ubound()
+        try:
+            return self.connections[end_label].get_ubound()
+        except KeyError:
+            raise NoConnection
 
     def set_ubound(self, end_label, ubound) -> None:
         """Sets the current ubound to end_label
         
         Raises:
-            KeyError:   end_label wasn't found
-                        in the connections
+            NoConnection:   end_label wasn't found
+                            in the connections
         """
-        self.connections[end_label].set_ubound(ubound)
+        try:
+            self.connections[end_label].set_ubound(ubound)
+        except KeyError:
+            raise NoConnection
 
     def get_flux(self, end_label) -> int:
         """Returns the current flux to end_label
         
         Raises:
-            KeyError:   end_label wasn't found
-                        in the connections
+            NoConnection:   end_label wasn't found
+                            in the connections
         """
-        return self.connections[end_label].get_flux()
+        try:
+            return self.connections[end_label].get_flux()
+        except KeyError:
+            raise NoConnection
 
     def set_flux(self, end_label, flux) -> None:
         """Sets the current flux to end_label
         
         Raises:
-            KeyError:   end_label wasn't found
-                        in the connections
+            NoConnection:   end_label wasn't found
+                            in the connections
         """
-        self.connections[end_label].set_flux(flux)
+        try:
+            self.connections[end_label].set_flux(flux)
+        except KeyError:
+            raise NoConnection
 
     def __str__(self):
         def comparison_function(edge):
@@ -225,6 +254,9 @@ class Graph():
 
     def add_node(self, label:Hashable, value:int=None) -> None:
         """Adds a node to the graph
+
+        If label is already in the graph, update its value iff it was None,
+        and a non-None value is supplied
         """
         if label not in self.list_nodes():
             self.node_map[label] = Node(label, value)
@@ -292,6 +324,52 @@ class Graph():
             if self.is_connected(node, end_label):
                 yield node 
 
+    def flux_forward_star(self, start_label:Hashable) -> GeneratorType:
+        """Returns an iterator of the nodes of the residual graph
+           reachable from start_label
+
+        A node is considered reachable in the residual graph if it's
+        connected to an already reachable node by an edge with flux
+        strictly less than capacity, or if it is connected to a node
+        with flux strictly greater than 0
+
+        Raises:
+            KeyError:   start_label wasn't found in the graph
+        """
+        for node in self.forward_star(self, start_label):
+            if self.get_flux(start_label, node) <\
+               self.get_ubound(start_label, node):
+                yield node
+        for node in self.backward_star(self, start_label):
+            if self.get_flux(node, start_label) > 0:
+                yield node
+
+    def _get_flux_min_weight_connection(self, start_label:Hashable,
+                                          end_label:Hashable) -> int:
+        """Returns the weight of the connection in the residual graph
+
+        Returns the minimum weight of start_label -> end_label in the
+        residual graph (which is the weight itself if start_label ->
+        end_label in the original graph, the weight with the opposite
+        sign if end_label -> start_label). Returns float("inf") if no
+        suitable connection was found
+
+        Raises:
+            KeyError:       either start_label or end_label weren't found
+                            in the graph
+        """
+        try:
+            out_val = self.get_weight(start_label, end_label)
+        except (KeyError, NoConnection):
+            out_val = float("inf")
+        try:
+            in_val = (-1) * self.get_weight(end_label, start_label)
+        except (KeyError, NoConnection):
+            in_val = float("inf")
+
+        return min(in_val, out_val)
+                
+
     def get_node_value(self, label:Hashable) -> int:
         """Returns the value of the node label
         
@@ -312,8 +390,9 @@ class Graph():
         """Returns the current weight from start_label to end_label
 
         Raises:
-            KeyError:   either start_label or end_label weren't found
-                        in the graph
+            KeyError:       start_label wasn't found in the graph
+            NoConnection:   end_label wasn't connnected to start_label
+                        
         """
         return self.node_map[start_label].get_weight(end_label)
 
@@ -321,8 +400,8 @@ class Graph():
         """Sets the current weight from start_label to end_label
         
         Raises:
-            KeyError:   either start_label or end_label weren't found
-                        in the graph
+            KeyError:       start_label wasn't found in the graph
+            NoConnection:   end_label wasn't connnected to start_label
         """
         self.node_map[start_label].set_weight(end_label, weight)
 
@@ -330,8 +409,8 @@ class Graph():
         """Returns the current lbound from start_label to end_label
         
         Raises:
-            KeyError:   either start_label or end_label weren't found
-                        in the graph
+            KeyError:       start_label wasn't found in the graph
+            NoConnection:   end_label wasn't connected to start_label
         """
         return self.node_map[start_label].get_lbound(end_label)
 
@@ -339,8 +418,8 @@ class Graph():
         """Sets the current lbound from start_label to end_label
         
         Raises:
-            KeyError:   either start_label or end_label weren't found
-                        in the graph
+            KeyError:       start_label wasn't found in the graph
+            NoConnection:   end_label wasn't connected to start_label
         """
         self.node_map[start_label].set_lbound(end_label, lbound)
 
@@ -348,8 +427,8 @@ class Graph():
         """Returns the current ubound from start_label to end_label
         
         Raises:
-            KeyError:   either start_label or end_label weren't found
-                        in the graph
+            KeyError:       start_label wasn't found in the graph
+            NoConnection:   end_label wasn't connected to start_label
         """
         return self.node_map[start_label].get_ubound(end_label)
 
@@ -357,8 +436,8 @@ class Graph():
         """Sets the current ubound from start_label to end_label
         
         Raises:
-            KeyError:   either start_label or end_label weren't found
-                        in the graph
+            KeyError:       start_label wasn't found in the graph
+            NoConnection:   end_label wasn't connected to start_label
         """
         self.node_map[start_label].set_ubound(end_label, ubound)
 
@@ -366,8 +445,8 @@ class Graph():
         """Returns the current flux from start_label to end_label
         
         Raises:
-            KeyError:   either start_label or end_label weren't found
-                        in the graph
+            KeyError:       start_label wasn't found in the graph
+            NoConnection:   end_label wasn't connected to start_label
         """
         return self.node_map[start_label].get_flux(end_label)
 
@@ -375,17 +454,31 @@ class Graph():
         """Sets the current flux from start_label to end_label
         
         Raises:
-            KeyError:   either start_label or end_label weren't found
-                        in the graph
+            KeyError:       start_label wasn't found in the graph
+            NoConnection:   end_label wasn't connected to start_label
         """
         self.node_map[start_label].set_flux(end_label, flux)
 
-    def _shortest_path(self, start_node:Hashable, queue:Queue) -> "Graph":
+    def _shortest_path(self, start_node:Hashable, queue:Queue,
+                             verbose:bool=False) -> "Graph":
         father = {}
         distance = {}
 
+        if verbose:
+            node_list = [n for n in self.list_nodes()]
+            print("{:^5}|{:^5}".format("u","d") +
+                   (" " * 5 * (len(node_list)-1)) +
+                   "|{:^5}".format("p") + 
+                   (" " * 5 * (len(node_list)-1)) + 
+                   "|{:^5}".format("Q"))
+            print("{:^5}".format("") +
+                 ("|"+ ("{:^5}"*len(node_list)).format(*node_list)) *2 + 
+                  "|")
+            print("-"*5 + "|" +
+                  ("-"*5*len(node_list) + "|")*2) 
+
         for node in self.list_nodes():
-            distance[node] = None
+            distance[node] = float("inf")
             father[node] = None
 
         distance[start_node] = 0
@@ -396,15 +489,18 @@ class Graph():
         while not queue.empty():
             node = queue.get()
             for neighbour in self.forward_star(node):
-                if distance[neighbour] == None or \
-                   (self.get_weight(node, neighbour) != None and \
-                    distance[node] + self.get_weight(node, neighbour) < distance[neighbour]):
-                    connection_weight = self.get_weight(node, neighbour)
-                    if connection_weight == None:
-                        connection_weight = 0
+                connection_weight = self.get_weight(node, neighbour)
+                if not connection_weight:
+                    connection_weight = 0
+                if distance[node] + connection_weight < distance[neighbour]:
                     distance[neighbour] = distance[node] + connection_weight
                     father[neighbour] = node
-                    queue.put(neighbour, distance[neighbour])
+                    if not queue.is_in(neighbour):
+                        queue.put(neighbour, distance[neighbour])
+            if verbose:
+                row_format = "{:^5}|" + (("{:^5}"*len(node_list)) + "|")*2
+                print(row_format.format(node, *([distance[n] for n in node_list]+[father[n] for n in node_list])),queue)
+
 
         result = Graph()
         result.add_node(start_node,value=0)
@@ -415,21 +511,21 @@ class Graph():
 
         return result
 
-    def dijkstra(self, start_label:Hashable) -> "Graph":
+    def dijkstra(self, start_label:Hashable, verbose:bool=False) -> "Graph":
         """Returns the graph of the visit starting from start_label
 
         Dijkstra's algorithm is used for the visit
         """
-        queue = FifoQueue()
-        return self._shortest_path(start_label, queue)
+        queue = PriorityQueue()
+        return self._shortest_path(start_label, queue, verbose)
 
-    def bellman(self, start_label:Hashable) -> "Graph":
+    def bellman(self, start_label:Hashable, verbose:bool=False) -> "Graph":
         """Returns the graph of the visit starting from start_label
 
         Bellman's algorithm is used for the visit
         """
-        queue = PriorityQueue()
-        return self._shortest_path(start_label, queue)
+        queue = FifoQueue()
+        return self._shortest_path(start_label, queue, verbose)
 
     def create_img(self, name_file:str) -> None:
         with subprocess.Popen(["dot", "-Tjpg", "-o", name_file],
@@ -437,7 +533,6 @@ class Graph():
             proc.stdin.write(bytes("digraph {\n"\
                                    "    rankdir=LR\n", "UTF-8"))
             for node in self.list_nodes():
-                print(node)
                 for child in self.forward_star(node):
                     proc.stdin.write(bytes("    {0} -> {1} ".format(node,
                                                                     child),
@@ -455,19 +550,85 @@ class Graph():
             graph_list.append(str(self.node_map[node]))
         return "\n".join(graph_list) 
 
+def parse_graph(file_name:str) -> "Graph":
+    """Parses a graph from the file file_name
+
+    An example of the graph format is in the file test.data
+
+    Raises:
+        FileNotFoundError:  no file called file_name was found
+    """
+    with open(file_name) as f:
+        lines = f.read()
+        statements = lines.split(";")
+        start_end_labels_regex = re.compile(r"(\w+).*?->.*?(\w+)")
+        weight_regex = re.compile(r"\(.*?(-?\d+).*?\)")
+        g = Graph()
+        for s in statements:
+            if not s:
+                continue
+            match_start_end = start_end_labels_regex.search(s)
+            if not match_start_end:
+                continue
+            try:
+                start = int(match_start_end.group(1))
+            except ValueError:
+                start = match_start_end.group(1)
+            try:
+                end = int(match_start_end.group(2))
+            except ValueError:
+                end = match_start_end.group(2)
+            match_weight = weight_regex.search(s)
+            if not match_weight:
+                weight = 0
+            else:
+                try:
+                    weight = int(match_weight.group(1))
+                except ValueError:
+                    weight = None
+            g.add_node(start)
+            g.add_node(end)
+            g.add_connection(start,end, weight=weight)
+
+        return g
+
 if __name__ == '__main__':
-    g = Graph()
-    g.add_node(1)
-    g.add_node(2)
-    g.add_node(3)
-    g.add_node(4)
-    g.add_connection(1,2, weight=1)
-    g.add_connection(2,4, weight=1)
-    g.add_connection(2,3, weight=2)
-    g.add_connection(4,5, weight=1)
-    g.add_connection(3,5, weight=0)
-    print(g)
-    print(g.dijkstra(1))
-    print()
-    print(g.bellman(1))
-    g.create_img("test.jpg")
+    #g = Graph()
+    #g.add_node(1)
+    #g.add_node(2)
+    #g.add_node(3)
+    #g.add_node(4)
+    #g.add_node(5)
+    #g.add_node(6)
+    #g.add_connection(1,2, weight=2)
+    #g.add_connection(1,4, weight=2)
+    #g.add_connection(1,5, weight=4)
+    #g.add_connection(1,6, weight=8)
+    #g.add_connection(2,3, weight=5)
+    #g.add_connection(2,5, weight=-1)
+    #g.add_connection(2,6, weight=5)
+    #g.add_connection(3,4, weight=2)
+    #g.add_connection(3,6, weight=1)
+    #g.add_connection(4,2, weight=-1)
+    #g.add_connection(4,5, weight=1)
+    #g.add_connection(5,3, weight=2)
+    #g.add_connection(5,6, weight=4)
+    #print("Graph:")
+    #print(g,"\n")
+    #print("Dijkstra:")
+    #print(g.dijkstra(1, True),"\n")
+    #print("Bellman:","\n")
+    #print(g.bellman(1, True))
+    #g.create_img("test.jpg")
+    arguments = sys.argv[1:]
+    for a in arguments:
+        try:
+            g = parse_graph(a)
+        except FileNotFoundError:
+            print("ERROR: File {} not found".format(a))
+            continue
+        print(g)
+        print("Dijkstra:")
+        print(g.dijkstra(1, True))
+        print("Bellman:")
+        print(g.bellman(1, True))

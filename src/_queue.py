@@ -2,6 +2,7 @@
 
 from abc import abstractmethod, ABCMeta
 import heapq
+from types import GeneratorType
 
 class EmptyException(Exception):
     pass
@@ -52,6 +53,10 @@ class Queue(metaclass=ABCMeta):
         """
         pass
 
+    @abstractmethod
+    def __iter__(self) -> GeneratorType:
+        pass
+
 class FifoQueue(Queue):
     """Implementation of a Fifo queue
     """
@@ -97,6 +102,10 @@ class FifoQueue(Queue):
 
     def __str__(self) -> None:
         return str(self.elements)
+
+    def __iter__(self) -> GeneratorType:
+        for e in self.elements:
+            yield e
 
 
 class PriorityQueue(metaclass=ABCMeta):
@@ -156,7 +165,11 @@ class PriorityQueue(metaclass=ABCMeta):
         return len(self.elements)
 
     def __str__(self) -> None:
-        return str(self.elements)
+        return str([e[2] for e in self.elements])
+
+    def __iter__(self) -> GeneratorType:
+        for e in self.elements:
+            yield e
 
 if __name__ == '__main__':
     fq = FifoQueue()
