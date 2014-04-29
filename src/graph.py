@@ -67,6 +67,12 @@ class Edge():
         """
         self.flux = flux
 
+    def copy(self) -> "Edge":
+        """Copies the current edge
+        """
+        return Edge(self.end_label, self.weight, self.lbound,
+                        self.ubound, self.flux)
+
     def __str__(self):
         metadata = []
         if self.weight != None:
@@ -227,6 +233,14 @@ class Node():
         except KeyError:
             raise NoConnection
 
+    def copy(self) -> "Node":
+        """Copies the current node
+        """
+        new_node = Node(self.label, self.value)
+        for key in self.connections.keys():
+            new_node.connections[key] = self.connections[key].copy()
+        return new_node
+
     def __str__(self):
         def comparison_function(edge):
             return edge.end_label
@@ -336,39 +350,16 @@ class Graph():
         Raises:
             KeyError:   start_label wasn't found in the graph
         """
+        fs_set = set()
         for node in self.forward_star(self, start_label):
             if self.get_flux(start_label, node) <\
                self.get_ubound(start_label, node):
-                yield node
+                set.add(node)
         for node in self.backward_star(self, start_label):
             if self.get_flux(node, start_label) > 0:
-                yield node
-
-    def _get_flux_min_weight_connection(self, start_label:Hashable,
-                                          end_label:Hashable) -> int:
-        """Returns the weight of the connection in the residual graph
-
-        Returns the minimum weight of start_label -> end_label in the
-        residual graph (which is the weight itself if start_label ->
-        end_label in the original graph, the weight with the opposite
-        sign if end_label -> start_label). Returns float("inf") if no
-        suitable connection was found
-
-        Raises:
-            KeyError:       either start_label or end_label weren't found
-                            in the graph
-        """
-        try:
-            out_val = self.get_weight(start_label, end_label)
-        except (KeyError, NoConnection):
-            out_val = float("inf")
-        try:
-            in_val = (-1) * self.get_weight(end_label, start_label)
-        except (KeyError, NoConnection):
-            in_val = float("inf")
-
-        return min(in_val, out_val)
-                
+                set.add(node)
+        for node in fs_set:
+            yield node
 
     def get_node_value(self, label:Hashable) -> int:
         """Returns the value of the node label
@@ -499,7 +490,11 @@ class Graph():
                         queue.put(neighbour, distance[neighbour])
             if verbose:
                 row_format = "{:^5}|" + (("{:^5}"*len(node_list)) + "|")*2
-                print(row_format.format(node, *([distance[n] for n in node_list]+[father[n] for n in node_list])),queue)
+                d_list = [distance[n] for n in node_list]
+                f_list = [father[n] for n in node_list]
+                p_list = d_list + f_list
+                #print(row_format.format(node, *([distance[n] for n in node_list]+[father[n] for n in node_list])),queue)
+                print(row_format.format(node, *p_list),queue)
 
 
         result = Graph()
@@ -543,6 +538,29 @@ class Graph():
                                                ), "UTF-8"))
                     proc.stdin.write(bytes(";\n", "UTF-8"))
             proc.stdin.write(bytes("}\n", "UTF-8"))
+
+    #def residual_graph(self) -> "Graph":
+    #    """Create the residual graph of the current flow
+    #    """
+    #    residual_g = Graph()
+    #    for node in self.list_nodes():
+    #        for end_node in self.flux_forward_star():
+    #            residual_g.add_connection(node, end_node, flux=0,
+    #                                      ubound=(
+    #                flux=0,ubou
+    #def add_connection(self, start_label:Hashable, end_label:Hashable,
+    #                         weight:int=None, lbound:int=None,
+    #                         ubound:int=None, flux:int=None) -> None:
+    #        
+            
+                    
+    def copy(self) -> "Graph":
+        """Copy current graph
+        """
+        new_graph = Graph(self.directed)
+        for label in self.node_map.keys():
+            new_graph.node_map[label] = self.node_map[label].copy()
+        return new_graph
 
     def __str__(self):
         graph_list = []
@@ -627,6 +645,7 @@ if __name__ == '__main__':
         except FileNotFoundError:
             print("ERROR: File {} not found".format(a))
             continue
+        g = g.copy()
         print(g)
         print("Dijkstra:")
         print(g.dijkstra(1, True))
