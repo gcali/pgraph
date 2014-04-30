@@ -27,7 +27,7 @@ class Edge():
         self.ubound = ubound
         self.flux = flux
 
-    def get_weight(self:Hashable) -> int:
+    def get_weight(self:"Hashable") -> int:
         """Returns the current weight 
         """
         return self.weight
@@ -77,12 +77,12 @@ class Edge():
         metadata = []
         if self.weight != None:
             metadata.append("$" + str(self.weight))
+        if self.flux != None:
+            metadata.append("~" + str(self.flux))
         if self.lbound != None:
             metadata.append("b" + str(self.lbound))
         if self.ubound != None:
             metadata.append("B" + str(self.ubound))
-        if self.flux != None:
-            metadata.append("~" + str(self.flux))
 
         metadata = ";".join(metadata)
         if metadata:
@@ -102,13 +102,13 @@ class Node():
         self.value = value
         self.connections = {}
 
-    def connect(self, end_label:Hashable, weight:int, lbound:int,
+    def connect(self, end_label:"Hashable", weight:int, lbound:int,
                       ubound:int, flux:int) -> None:
         """Connect the node to another one"""
         self.connections[end_label] = Edge(end_label, weight, lbound,
                                            ubound, flux)
 
-    def remove_connection(self, end_label:Hashable) -> None:
+    def remove_connection(self, end_label:"Hashable") -> None:
         """Remove a connection
 
         Raises:
@@ -116,7 +116,7 @@ class Node():
         """
         del(self.connections[end_label])
 
-    def is_connected(self, end_label:Hashable) -> bool:
+    def is_connected(self, end_label:"Hashable") -> bool:
         """Returns True iff the node is connected to end_label
         """
         return end_label in self.connections
@@ -137,7 +137,7 @@ class Node():
         """
         self.value = value
 
-    def get_weight(self, end_label:Hashable) -> int:
+    def get_weight(self, end_label:"Hashable") -> int:
         """Returns the current weight to end_label
 
         Raises:
@@ -266,7 +266,7 @@ class Graph():
         self.node_map = {}
         self.directed = directed
 
-    def add_node(self, label:Hashable, value:int=None) -> None:
+    def add_node(self, label:"Hashable", value:int=None) -> None:
         """Adds a node to the graph
 
         If label is already in the graph, update its value iff it was None,
@@ -277,7 +277,7 @@ class Graph():
         if value != None and self.get_node_value(label) == None:
             self.set_value(label, value)
 
-    def add_connection(self, start_label:Hashable, end_label:Hashable,
+    def add_connection(self, start_label:"Hashable", end_label:"Hashable",
                              weight:int=None, lbound:int=None,
                              ubound:int=None, flux:int=None) -> None:
         """Adds a connection to the graph
@@ -291,8 +291,8 @@ class Graph():
             self.node_map[end_label].connect(start_label, weight, lbound,
                                              ubound, flux)
     
-    def remove_connection(self, start_label:Hashable,
-                          end_label:Hashable) -> None:
+    def remove_connection(self, start_label:"Hashable",
+                          end_label:"Hashable") -> None:
         """Remove a connection from the graph
 
         Raises:
@@ -301,7 +301,7 @@ class Graph():
         """
         self.node_map[start_label].remove_connection(end_label)
 
-    def is_connected(self, start_label:Hashable, end_label:Hashable) -> bool:
+    def is_connected(self, start_label:"Hashable", end_label:"Hashable") -> bool:
         """Returns True iff start_label -> end_label
         """
         try:
@@ -315,7 +315,7 @@ class Graph():
         for node in sorted(self.node_map.keys()):
             yield node
 
-    def forward_star(self, start_label:Hashable) -> GeneratorType:
+    def forward_star(self, start_label:"Hashable") -> GeneratorType:
         """Returns an iterator of the nodes reachable from start_label
 
         Raises:
@@ -328,7 +328,7 @@ class Graph():
                                    self.backward_star(start_label))
             
     
-    def backward_star(self, end_label:Hashable) -> GeneratorType:
+    def backward_star(self, end_label:"Hashable") -> GeneratorType:
         """Returns an iterator of the nodes from which end_label can be reached
 
         Raises:
@@ -338,7 +338,7 @@ class Graph():
             if self.is_connected(node, end_label):
                 yield node 
 
-    def flux_forward_star(self, start_label:Hashable) -> GeneratorType:
+    def flux_forward_star(self, start_label:"Hashable") -> GeneratorType:
         """Returns an iterator of the nodes of the residual graph
            reachable from start_label
 
@@ -361,7 +361,7 @@ class Graph():
         for node in fs_set:
             yield node
 
-    def get_node_value(self, label:Hashable) -> int:
+    def get_node_value(self, label:"Hashable") -> int:
         """Returns the value of the node label
         
         Raises:
@@ -369,7 +369,7 @@ class Graph():
         """
         return self.node_map[label].get_value()
 
-    def set_node_value(self, label:Hashable, value:int) -> None:
+    def set_node_value(self, label:"Hashable", value:int) -> None:
         """Sets the value of the node label
 
         Raises:
@@ -377,7 +377,7 @@ class Graph():
         """
         self.node_map[label].set_value(value)
 
-    def get_weight(self, start_label:Hashable, end_label:Hashable) -> int:
+    def get_weight(self, start_label:"Hashable", end_label:"Hashable") -> int:
         """Returns the current weight from start_label to end_label
 
         Raises:
@@ -387,7 +387,7 @@ class Graph():
         """
         return self.node_map[start_label].get_weight(end_label)
 
-    def set_weight(self, start_label:Hashable, end_label, weight) -> None:
+    def set_weight(self, start_label:"Hashable", end_label, weight) -> None:
         """Sets the current weight from start_label to end_label
         
         Raises:
@@ -450,7 +450,7 @@ class Graph():
         """
         self.node_map[start_label].set_flux(end_label, flux)
 
-    def _shortest_path(self, start_node:Hashable, queue:Queue,
+    def _shortest_path(self, start_node:"Hashable", queue:Queue,
                              verbose:bool=False) -> "Graph":
         father = {}
         distance = {}
@@ -489,11 +489,10 @@ class Graph():
                     if not queue.is_in(neighbour):
                         queue.put(neighbour, distance[neighbour])
             if verbose:
-                row_format = "{:^5}|" + (("{:^5}"*len(node_list)) + "|")*2
                 d_list = [distance[n] for n in node_list]
                 f_list = [father[n] for n in node_list]
                 p_list = d_list + f_list
-                #print(row_format.format(node, *([distance[n] for n in node_list]+[father[n] for n in node_list])),queue)
+                row_format = "{:^5}|" + (("{:^5}"*len(node_list)) + "|")*2
                 print(row_format.format(node, *p_list),queue)
 
 
@@ -506,7 +505,7 @@ class Graph():
 
         return result
 
-    def dijkstra(self, start_label:Hashable, verbose:bool=False) -> "Graph":
+    def dijkstra(self, start_label:"Hashable", verbose:bool=False) -> "Graph":
         """Returns the graph of the visit starting from start_label
 
         Dijkstra's algorithm is used for the visit
@@ -514,7 +513,7 @@ class Graph():
         queue = PriorityQueue()
         return self._shortest_path(start_label, queue, verbose)
 
-    def bellman(self, start_label:Hashable, verbose:bool=False) -> "Graph":
+    def bellman(self, start_label:"Hashable", verbose:bool=False) -> "Graph":
         """Returns the graph of the visit starting from start_label
 
         Bellman's algorithm is used for the visit
@@ -539,20 +538,37 @@ class Graph():
                     proc.stdin.write(bytes(";\n", "UTF-8"))
             proc.stdin.write(bytes("}\n", "UTF-8"))
 
-    #def residual_graph(self) -> "Graph":
-    #    """Create the residual graph of the current flow
-    #    """
-    #    residual_g = Graph()
-    #    for node in self.list_nodes():
-    #        for end_node in self.flux_forward_star():
-    #            residual_g.add_connection(node, end_node, flux=0,
-    #                                      ubound=(
-    #                flux=0,ubou
-    #def add_connection(self, start_label:Hashable, end_label:Hashable,
-    #                         weight:int=None, lbound:int=None,
-    #                         ubound:int=None, flux:int=None) -> None:
-    #        
-            
+    def residual_graph(self) -> "Graph":
+        """Create the residual graph of the current flow
+        """
+        def _to_be_inserted(rg, s, e, w):
+            return (not rg.is_connected(s,e)) or (rg.get_weight != None and
+                                                  rg.get_weight(s,e) < w)
+
+        residual_g = Graph()
+        for node in self.list_nodes():
+            for end_node in self.forward_star(node):
+                w = self.get_weight(node, end_node)
+                if _to_be_inserted(residual_g, node, end_node, w):
+                    residual_ubound = self.get_ubound(node, end_node) -\
+                                      self.get_flux(node, end_node)
+                    if residual_ubound > 0:
+                        residual_g.add_connection(
+                            node, end_node,
+                            ubound=residual_ubound,
+                            weight=w
+                            )
+                if w != None:
+                    w = w * (-1)
+                if _to_be_inserted(residual_g, end_node, node, w):
+                    residual_ubound = self.get_flux(node, end_node)
+                    if residual_ubound > 0:
+                        residual_g.add_connection(
+                            end_node, node,
+                            ubound=residual_ubound,
+                            weight=w
+                            )
+        return residual_g
                     
     def copy(self) -> "Graph":
         """Copy current graph
@@ -638,16 +654,25 @@ if __name__ == '__main__':
     #print("Bellman:","\n")
     #print(g.bellman(1, True))
     #g.create_img("test.jpg")
-    arguments = sys.argv[1:]
-    for a in arguments:
-        try:
-            g = parse_graph(a)
-        except FileNotFoundError:
-            print("ERROR: File {} not found".format(a))
-            continue
-        g = g.copy()
-        print(g)
-        print("Dijkstra:")
-        print(g.dijkstra(1, True))
-        print("Bellman:")
-        print(g.bellman(1, True))
+#    arguments = sys.argv[1:]
+#    for a in arguments:
+#        try:
+#            g = parse_graph(a)
+#        except FileNotFoundError:
+#            print("ERROR: File {} not found".format(a))
+#            continue
+#        g = g.copy()
+#        print(g)
+#        print("Dijkstra:")
+#        print(g.dijkstra(1, True))
+#        print("Bellman:")
+#        print(g.bellman(1, True))
+    g = Graph()
+    g.add_node(1)
+    g.add_node(2)
+    g.add_node(3)
+    g.add_connection(1, 2, flux=3, ubound=5)
+    g.add_connection(2, 3, flux=2, ubound=3)
+    g.add_connection(3, 1, flux=0, ubound=1)
+    print(g)
+    print(g.residual_graph())
