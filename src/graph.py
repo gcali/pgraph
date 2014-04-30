@@ -10,7 +10,7 @@ import re
 
 from _queue import Queue, FifoQueue, PriorityQueue
 
-class NoConection(Exception):
+class NoConnection(Exception):
     pass
 
 class Edge():
@@ -569,7 +569,80 @@ class Graph():
                             weight=w
                             )
         return residual_g
-                    
+
+    def _flux_find_path(self, start_label, end_label, start_capacity=float("inf")):
+        class FoundException(Exception):
+            pass
+        queue = FifoQueue()
+        queue.put(start_label)
+        father = {}
+        capacity = {}
+        for node in self.list_nodes():
+            father[node] = None
+            capacity[node] = start_capacity
+        found = False
+        try:
+            while not queue.empty():
+                current = queue.get()
+                for node in self.forward_star(current):
+                    if node != start_label and\
+                       father[node] == None and\
+                       self.get_flux(current,node) <\
+                            self.get_ubound(current,node):
+                        father[node] = current
+                        capacity[node] = min(
+                            capacity[current],
+                            self.get_ubound(current,
+                                            node) - self.get_flux(current,
+                                                                  node)
+                        )
+                        if node == end_label:
+                            raise FoundException
+                        queue.put(node)
+                for node in self.backward_star(current):
+                    if node != start_label and\
+                       father[node] == None and\
+                       self.get_flux(node,current) > 0:
+                        father[node] = current
+                        capacity[node] = min(
+                            capacity[current],
+                            self.get_flux(node,current)
+                        )
+                        if node == end_label:
+                            raise FoundException
+                        queue.put(node)
+        except FoundException:
+            node = end_label
+            path = [end_label]
+            while father[node] != None:
+                path.append(father[node])
+                node = father[node]
+            return (path[::-1],capacity[end_label])
+        raise NoConnection("No path {} -> {}".format(start_label,
+                                                     end_label))
+
+    def _push_flux(self, path, capacity):
+        for i in range(len(path)-1):
+            start = path[i]
+            end = path[i+1]
+            if self.is_connected(start, end):
+                self.set_flux(start, end, 
+                              self.get_flux(start, end) + capacity)
+            else:
+                self.set_flux(end, start, 
+                              self.get_flux(end, start) - capacity)
+
+    def max_flux(self, start, end):
+        try:
+            while True:
+                path, capacity = self._flux_find_path(start, end)
+                self._push_flux(path, capacity)
+                #print("G", self)
+                #print("p", path)
+                #print("c", capacity)
+        except NoConnection:
+            pass
+            
     def copy(self) -> "Graph":
         """Copy current graph
         """
@@ -592,11 +665,23 @@ def parse_graph(file_name:str) -> "Graph":
     Raises:
         FileNotFoundError:  no file called file_name was found
     """
+    def parse_match(regex, string):
+        match = regex.search(s)
+        if not match:
+            return None
+        else:
+            try:
+                return int(match.group(1))
+            except ValueError:
+                return None
     with open(file_name) as f:
         lines = f.read()
         statements = lines.split(";")
         start_end_labels_regex = re.compile(r"(\w+).*?->.*?(\w+)")
-        weight_regex = re.compile(r"\(.*?(-?\d+).*?\)")
+        template_value_regex_string = r".*?{}(-?\d+).*?"
+        weight_regex = re.compile(template_value_regex_string.format(r"\$"))
+        ubound_regex = re.compile(template_value_regex_string.format("B"))
+        flux_regex = re.compile(template_value_regex_string.format("~"))
         g = Graph()
         for s in statements:
             if not s:
@@ -612,17 +697,14 @@ def parse_graph(file_name:str) -> "Graph":
                 end = int(match_start_end.group(2))
             except ValueError:
                 end = match_start_end.group(2)
-            match_weight = weight_regex.search(s)
-            if not match_weight:
-                weight = 0
-            else:
-                try:
-                    weight = int(match_weight.group(1))
-                except ValueError:
-                    weight = None
+            weight = parse_match(weight_regex, s)
+            ubound = parse_match(ubound_regex, s)
+            flux = parse_match(flux_regex, s)
+            if flux == None and ubound != None:
+                flux = 0
             g.add_node(start)
             g.add_node(end)
-            g.add_connection(start,end, weight=weight)
+            g.add_connection(start,end, weight=weight, flux=flux, ubound=ubound)
 
         return g
 
@@ -654,25 +736,78 @@ if __name__ == '__main__':
     #print("Bellman:","\n")
     #print(g.bellman(1, True))
     #g.create_img("test.jpg")
-#    arguments = sys.argv[1:]
-#    for a in arguments:
-#        try:
-#            g = parse_graph(a)
-#        except FileNotFoundError:
-#            print("ERROR: File {} not found".format(a))
-#            continue
-#        g = g.copy()
-#        print(g)
-#        print("Dijkstra:")
-#        print(g.dijkstra(1, True))
-#        print("Bellman:")
-#        print(g.bellman(1, True))
-    g = Graph()
-    g.add_node(1)
-    g.add_node(2)
-    g.add_node(3)
-    g.add_connection(1, 2, flux=3, ubound=5)
-    g.add_connection(2, 3, flux=2, ubound=3)
-    g.add_connection(3, 1, flux=0, ubound=1)
-    print(g)
-    print(g.residual_graph())
+    arguments = sys.argv[1:]
+    mode = "path"
+    set_source = False
+    set_dest = False
+    source = None
+    dest = None
+    for a in arguments:
+        if set_source:
+            source = int(a)
+            set_source = False
+            continue
+        elif set_dest:
+            dest = int(a)
+            set_dest = False
+            continue
+        elif a == "-p":
+            mode = "path"
+            continue
+        elif a == "-f":
+            mode = "flux"
+            continue
+        elif a == "-s":
+            set_source = True
+            continue
+        elif a == "-d":
+            set_dest = True
+            continue
+        try:
+            g = parse_graph(a)
+        except FileNotFoundError:
+            print("ERROR: File {} not found".format(a))
+            continue
+        if mode == "path":
+            print("Shortest path algorithm")
+            print(g)
+            if source == None:
+                source = 1
+                print("Source not specified, assuming 1")
+            print("Dijkstra:")
+            print(g.dijkstra(source, True))
+            print("Bellman:")
+            print(g.bellman(source, True))
+        elif mode == "flux":
+            print("Max flux algorithm")
+            print(g)
+            if source == None or dest == None:
+                print("Source or dest not specified from {}".format(a))
+                continue
+            g_flux = g.copy()
+            g_flux.max_flux(source, dest)
+            print(g_flux)
+    #g = Graph()
+    #g.add_node(1)
+    #g.add_node(2)
+    #g.add_node(3)
+    #g.add_node(4)
+    #g.add_node(5)
+    #g.add_node(6)
+    #g.add_connection(1, 2, flux=0, ubound=5)
+    #g.add_connection(1, 3, flux=0, ubound=9)
+    #g.add_connection(2, 3, flux=0, ubound=7)
+    #g.add_connection(2, 4, flux=0, ubound=4)
+    #g.add_connection(2, 5, flux=0, ubound=3)
+    #g.add_connection(3, 4, flux=0, ubound=10)
+    #g.add_connection(4, 5, flux=0, ubound=2)
+    #g.add_connection(4, 6, flux=0, ubound=8)
+    #g.add_connection(5, 6, flux=0, ubound=10)
+    #print(g)
+    #print(g.residual_graph())
+    #path,c = g._flux_find_path(1,3)
+    #print(path)
+    #print("capacity",c)
+    #g._push_flux(path, c)
+    #g.max_flux(1,6)
+    #print(g)
