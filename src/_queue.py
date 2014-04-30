@@ -119,7 +119,7 @@ class PriorityQueue(metaclass=ABCMeta):
         """constructor
         """
         self.elements = []
-        self.counter = 0
+        #self.counter = 0
 
     def put(self, item:"Comparable", value:int=None) -> None:
         """Puts a new element in the queue
@@ -128,8 +128,8 @@ class PriorityQueue(metaclass=ABCMeta):
             item:   The item to be put in the queue
             value:  The priority of the item
         """
-        heapq.heappush(self.elements, (value,self.counter,item))
-        self.counter += 1
+        heapq.heappush(self.elements, (value,item))
+        #self.counter += 1
 
     def get(self) -> "Comparable":
         """Returns the first element in the queue, removing it from the queue
@@ -138,7 +138,7 @@ class PriorityQueue(metaclass=ABCMeta):
             EmptyException: The queue was empty
         """
         try:
-            return (heapq.heappop(self.elements))[2]
+            return (heapq.heappop(self.elements))[1]
         except IndexError:
             raise EmptyException
 
@@ -154,7 +154,7 @@ class PriorityQueue(metaclass=ABCMeta):
         """Returns True iff item is in the queue
         """
         for t in self.elements:
-            if t[2] == item:
+            if t[1] == item:
                 return True
         else:
             return False
@@ -165,7 +165,7 @@ class PriorityQueue(metaclass=ABCMeta):
         return len(self.elements)
 
     def __str__(self) -> None:
-        return str([e[2] for e in self.elements])
+        return str([e[1] for e in self.elements])
 
     def __iter__(self) -> GeneratorType:
         for e in self.elements:
